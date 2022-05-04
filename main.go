@@ -9,12 +9,15 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+
+	"golang.org/x/exp/slices"
 	// "go_replace_extended/helper" // TODO: see if we can build with the original code with something link helper.Main()
 )
 
 var (
 	replaceMe   = os.Getenv("REPLACE_ME")   // "MY_AWS_REGION,ap-southeast-2|INTERNAL_ZONE_ID,YYYYYYYY"
 	installApps = os.Getenv("INSTALL_APPS") // "datadog,kyverno,gp3"
+	yamlExclude = []string{"kustomization"}
 )
 
 func RunShellCmd(command string) (stdout string, stderr string) {
@@ -65,18 +68,48 @@ func contains(elems []string, v string) bool {
 	return false
 }
 
+func kustomizeFile(allYamlFiles []string) (kFile string) {
+	kFile = ""
+	for _, file := range allYamlFiles {
+		if strings.Contains(file, "kustomization") {
+			kFile = file
+			break
+		}
+	}
+	return kFile
+}
+
 func removeFiles() {
 	// Remove the files not in appsList
 	appsList := strings.Split(installApps, ",")
 
-	for _, appFile := range findFiles(".", ".yaml") {
+	yamlFiles := findFiles(".", ".yaml")
+	ymlFiles := findFiles(".", ".yml")
+	allYamlFiles := append(yamlFiles, ymlFiles...)
+
+	kFile := kustomizeFile(allYamlFiles)
+	if kFile == "" {
+		log.Fatal("ERROR - kustomization.(yml|yaml) not found")
+	}
+
+	for _, appFile := range allYamlFiles {
 		appName := strings.Split(appFile, ".")[0]
-		if contains(appsList, appName) == false {
+		if slices.Contains(appsList, appName) == false && slices.Contains(yamlExclude, appName) == false {
+
+			// Remove File
 			e := os.Remove(appFile)
 			if e != nil {
 				log.Fatal(e)
 			} else {
 				// log.Printf("File %v removed", appFile)
+			}
+
+			// Remove Line from Kustomization
+			cmd := fmt.Sprintf("gor '\\- %s' -r ' '", appFile)
+			stdout, stderr := RunShellCmd(cmd)
+			fmt.Println(stdout)
+			if stderr != "" {
+				log.Fatalf("ERROR - Command %v failed with error %v \n", cmd, stderr)
 			}
 		}
 	}

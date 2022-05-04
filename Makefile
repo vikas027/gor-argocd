@@ -5,7 +5,7 @@
 
 ## VARIABLES
 BINARY_NAME = gor-argocd
-RELEASE_VERSION ?= v0.0.1
+RELEASE_VERSION ?= v0.0.2
 # Colour Outputs
 GREEN := \033[0;32m
 CLEAR := \033[00m
@@ -27,7 +27,7 @@ build_and_run: build run
 release: clean build run
 	@echo "$(GREEN)RELEASE: Creating a GitHub release $(CLEAR)"
 	gh release create $(RELEASE_VERSION) --generate-notes || true
-	gh release upload v0.0.1 $(BINARY_NAME)-linux --clobber
+	gh release upload $(RELEASE_VERSION) $(BINARY_NAME)-linux --clobber
 	$(MAKE) clean
 
 release_undo:
